@@ -1,0 +1,43 @@
+<!--
+#####################################################################################################################
+# Project...............: Yugioh Card Library
+# Author................: Ben Stearns
+# Date..................: 12-4-25
+# Project Description...: This application creates a digital database library for storing and managing Yugioh cards
+# File Description......: defines the base template all pages of the app extend
+#####################################################################################################################
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+    <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <title>{{title}}</title>
+</head>
+<body class="container text-center">
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+        <div class="container mt-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+    <div class="mx-auto page-header">
+        <div class="col">
+            <h3>{{title}}</h3>
+        </div>
+    </div>
+
+    {% block body %}
+    {% endblock %}
+</body>
+</html>

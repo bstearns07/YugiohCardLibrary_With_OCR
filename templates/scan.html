@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+<!--
+#####################################################################################################################
+# Project...............: Yugioh Card Library
+# Author................: Ben Stearns
+# Date..................: 12-4-25
+# Project Description...: This application creates a digital database library for storing and managing Yugioh cards
+# File Description......: defines the interface for uploading an image for OCR scanning
+#####################################################################################################################
+-->
+
+{% block body %}
+{% if not tesseract_exists %}
+    <h1>Oh no...Looks like you don't have tesseract installed on your PC to use this function</h1>
+    <p>Please install tesseract by visiting:
+        <a href="https://github.com/UB-Mannheim/tesseract/wiki" target="_blank">https://github.com/UB-Mannheim/tesseract/wiki</a>
+    </p>
+{% else %}
+    <form method="post" enctype="multipart/form-data">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label for="card_image" class="form-label form-label-strong">Card Image</label>
+            </div>
+            <div class="col">
+                <input type="file" class="form-control" id="card_image" name="card_image"
+                       accept="image/*">
+                {% if card and card.image_filename %}
+                <img src="{{ url_for('static', filename='images/cards/' ~ card.image_filename) }}"
+                     alt="Current Card Image" class="img-thumbnail mt-2" style="max-width:150px;">
+                {% endif %}
+            </div>
+        </div>
+        <div class="d-flex justify-content-center gap-2 mt-3">
+            <button class="btn btn-success w-100" style="max-width:200px;" type="submit">
+                Process Image
+            </button>
+
+            <a href="javascript:history.back()" class="btn btn-primary w-100" style="max-width:200px;">
+                Back
+            </a>
+        </div>
+    </form>
+{% endif %}
+{% endblock %}

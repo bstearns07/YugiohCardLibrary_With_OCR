@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+<!--
+#####################################################################################################################
+# Project...............: Yugioh Card Library
+# Author................: Ben Stearns
+# Date..................: 12-4-25
+# Project Description...: This application creates a digital database library for storing and managing Yugioh cards
+# File Description......: defines the interface where user can confirm an ocr scanned image and edit before posting
+#####################################################################################################################
+-->
+{% block body %}
+<form method="post" action="{{ url_for('confirm_scan') }}" enctype="multipart/form-data">
+    <div class="row mb-3">
+        <div class="col">
+
+            <!-- Hidden field: always sends the existing filename -->
+            <input type="hidden" name="image_filename" value="{{ card.image_filename if card else '' }}">
+
+            {% if card and card.image_filename %}
+            <img src="{{ url_for('static', filename='images/cards/' ~ card.image_filename) }}"
+                 alt="Current Card Image" class="img-thumbnail mt-2" style="max-width:400px;">
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label for="name" class="form-label form-label-strong">Name</label>
+        </div>
+        <div class="col">
+            <input id="name" type="text" class="form-control" name="name"
+                   value="{{ card.name if card else '' }}" required>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label class="form-label form-label-strong">Description</label>
+        </div>
+        <div class="col">
+            <textarea class="form-control" name="description" required>{{ card.description if card else '' }}</textarea>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label for="card_type" class="form-label form-label-strong">Card Type</label>
+        </div>
+        <div class="col">
+            <select id="card_type" class="form-select" name="card_type" required>
+                <option value="">Select Type</option>
+                <option value="Monster" {% if card and card.card_type=='Monster' %}selected{% endif %}>Monster</option>
+                <option value="Spell" {% if card and card.card_type=='Spell' %}selected{% endif %}>Spell</option>
+                <option value="Trap" {% if card and card.card_type=='Trap' %}selected{% endif %}>Trap</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="monster-fields">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label class="form-label form-label-strong">Monster Type</label>
+            </div>
+            <div class="col">
+                <input type="text" class="form-control" name="monster_type"
+                       value="{{ card.monster_type if card else '' }}">
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label class="form-label form-label-strong">Attack</label>
+            </div>
+            <div class="col">
+                <input type="text" class="form-control" name="attack"
+                       value="{{ card.attack if card else '' }}">
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label class="form-label form-label-strong">Defense</label>
+            </div>
+            <div class="col">
+                <input type="text" class="form-control" name="defense"
+                       value="{{ card.defense if card else '' }}">
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label class="form-label form-label-strong">Attribute</label>
+            </div>
+            <div class="col">
+                <input type="text" class="form-control" name="attribute"
+                       value="{{ card.attribute if card else '' }}">
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-center gap-2 mt-3">
+        <button class="btn btn-success w-100" style="max-width:200px;" type="submit">
+            Save
+        </button>
+
+        <a href="javascript:history.back()" class="btn btn-primary w-100" style="max-width:200px;">
+            Back
+        </a>
+        <a href="/" class="btn btn-danger w-100" style="max-width:200px;">
+            Cancel
+        </a>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const cardTypeSelect = document.getElementById("card_type");
+            const monsterFields = document.getElementById("monster-fields");
+
+            function toggleMonsterFields() {
+                if (cardTypeSelect.value === "Monster") {
+                    monsterFields.style.display = "block";
+                } else {
+                    monsterFields.style.display = "none";
+                }
+            }
+
+            // Initialize on page load
+            toggleMonsterFields();
+
+            // Toggle on change
+            cardTypeSelect.addEventListener("change", toggleMonsterFields);
+        });
+    </script>
+
+</form>
+</div>
+{% endblock %}

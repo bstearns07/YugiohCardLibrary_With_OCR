@@ -1,0 +1,100 @@
+/******************************************************************************
+ * HTML rules
+ ******************************************************************************/
+ /*Set text color to white*/
+html {
+    color: white;
+}
+
+/******************************************************************************
+ * Page Header rules
+ ******************************************************************************/
+.page-header {
+    background: linear-gradient(135deg, #6a11cb, #2575fc); /*applies blue gradient background*/
+    color: white; /*Text color*/
+    padding: 15px 25px;
+    text-align: center;
+    border-radius: 12px; /*rounded corners*/
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2); /*Edge shadow effect*/
+    margin-bottom: 20px;
+}
+.page-header h3 {
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/******************************************************************************
+ * Table rules
+ ******************************************************************************/
+/*Make all table  row animations occur smooth and change mouse icon to a pointer when the mouse hovers them*/
+/* Theme tables like a card r */
+.table {
+    border-radius: 12px;
+    overflow: hidden; /*Keeps background colors, box shadows etc from spilling out of the containter*/
+    background: white;
+}
+
+/* Header */
+.table thead th {
+    background: linear-gradient(135deg, #3f51b5, #5c6bc0);
+    color: white;
+    text-align: center;
+    padding: 12px;
+    border: none;
+}
+
+/* Make row hover transitions smooth and change cursor to a pointer upon hover */
+.table tbody tr {
+     transition: transform 0.15s ease, box-shadow 0.15s ease;
+     cursor: pointer;
+}
+
+/* Make row hovers increase scale size, apply a box shadow for pop */
+.table tbody tr:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+}
+
+/* Keep table buttons same size */
+.table td .btn {
+    width: 100px;
+}
+
+/* Align table cells in the middle of their container and increase font size */
+.table td {
+    vertical-align: middle;
+    font-size: 1rem;
+}
+
+/******************************************************************************
+ * Bootstrap card rules for main menu
+ ******************************************************************************/
+ /*Applies a linear-gradient background color, sets hover animations to be smooth, and rounds the corners*/
+.menu-card {
+    background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    border-radius: 20px;
+}
+
+/*Whenever a menu-card element is hovered, increase it's size, apply a box shadow, and change cursor to a pointer*/
+.menu-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    cursor: pointer;
+}
+
+/******************************************************************************
+ * MISC rules
+ ******************************************************************************/
+ /*Class rule to allow buttons in menus to be the same size*/
+.uniform-btn {
+    width: 200px;
+}
+
+/*Makes all form labels bolded, slightly larger, and dark grey to make them stand out a bit more*/
+.form-label-strong {
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: #333;
+}

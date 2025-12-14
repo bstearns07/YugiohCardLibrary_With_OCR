@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+<!--
+#####################################################################################################################
+# Project...............: Yugioh Card Library
+# Author................: Ben Stearns
+# Date..................: 12-4-25
+# Project Description...: This application creates a digital database library for storing and managing Yugioh cards
+# File Description......: defines the home page menu of the application
+#####################################################################################################################
+-->
+
+{% block body %}
+<h2 class="text-center mb-4 display-6 fw-bold text-primary">Main Menu</h2>
+
+<div class="row g-4 justify-content-center">
+
+    <!-- Card 1 -->
+    <div class="col-md-4">
+        <a href="/library" class="text-decoration-none">
+        <div class="menu-card card shadow-lg border-0 text-center p-4">
+            <div class="card-body">
+                <h3 class="card-title text-dark fw-bold mb-3">📚View Library</h3>
+            </div>
+        </div>
+        </a>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="col-md-4">
+        <a href="/scan" class="text-decoration-none">
+            <div class="menu-card card shadow-lg border-0 text-center p-4">
+                <div class="card-body">
+                    <h3 class="card-title text-dark fw-bold mb-3">📷 Scan Card Image</h3>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="col-md-4">
+        <a href="/add" class="text-decoration-none">
+            <div class="menu-card card shadow-lg border-0 text-center p-4">
+                <div class="card-body">
+                    <h3 class="card-title text-dark fw-bold mb-3">➕Add Card </h3>
+                </div>
+            </div>
+        </a>
+    </div>
+
+</div>
+
+{% endblock %}
