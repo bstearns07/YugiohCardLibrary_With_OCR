@@ -8,15 +8,17 @@
 
 # imports
 import os                                                                               # for file operations
-import sqlite3                                                                          # for sql error handling
+# import sqlite3                                                                          # for sql error handling
 from werkzeug.utils import secure_filename                                              # to sanitizing filenames
 from flask import Flask, session, render_template, request, redirect, flash, url_for    # for webapp functionality
 import webbrowser                                                                       # for launching the app
-import DBcm                                                                             # for database functionality
+# import DBcm                                                                             # for database functionality
 from utils.constants import KNOWN_ATTRIBUTES                                            # for populating SELECT element
 from utils.install_tesseract import ensure_tesseract                                    # to ensure tesseract installed
 from tesseract import process_yugioh_card                                               # for ocr image processing
 from supabase import create_client, Client                                              # for db connections/queries
+from supabase.client import Client                                                      # import supabase_client Client
+
 
 # main program variables
 app = Flask(__name__)                               # defines main app object associated with code's current namespace
