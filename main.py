@@ -16,6 +16,7 @@ import DBcm                                                                     
 from utils.constants import KNOWN_ATTRIBUTES                                            # for populating SELECT element
 from utils.install_tesseract import ensure_tesseract                                    # to ensure tesseract installed
 from tesseract import process_yugioh_card                                               # for ocr image processing
+from supabase import create_client, Client                                              # for db connections/queries
 
 # main program variables
 app = Flask(__name__)                               # defines main app object associated with code's current namespace
