@@ -124,14 +124,14 @@
         </div>
 
         <script>
-<           !--Add an event listening to wait until the full html is loaded before running script-->
+            // Wait until the full HTML is loaded before running the script
             document.addEventListener("DOMContentLoaded", function() {
 
-                !--Retrieve the value of the monster_type selected by the user and the container with id=monster-fields-->
+                // Retrieve the card_type select and the monster fields container
                 const cardTypeSelect = document.getElementById("card_type");
                 const monsterFields = document.getElementById("monster-fields");
 
-                !--Defines a function to toggle monster fields on or hidden if "Monster" is selected as type-->
+                // Toggle monster fields based on card type
                 function toggleMonsterFields() {
                     if (cardTypeSelect.value === "Monster") {
                         monsterFields.style.display = "block";
@@ -140,14 +140,13 @@
                     }
                 }
 
-                // Initialize function on page load
+                // Initialize on page load
                 toggleMonsterFields();
 
-                // Toggle whenever a new selection for card_type is made change
+                // Toggle whenever card_type changes
                 cardTypeSelect.addEventListener("change", toggleMonsterFields);
             });
         </script>
-
     </form>
 </div>
 {% endblock %}

@@ -8,17 +8,18 @@
 
 # imports
 import os                                                                               # for file operations
-# import sqlite3                                                                          # for sql error handling
 from werkzeug.utils import secure_filename                                              # to sanitizing filenames
 from flask import Flask, session, render_template, request, redirect, flash, url_for    # for webapp functionality
 import webbrowser                                                                       # for launching the app
-# import DBcm                                                                             # for database functionality
+
+from data_layer.supabase_client import supabase
 from utils.constants import KNOWN_ATTRIBUTES                                            # for populating SELECT element
+from utils.convert_int_to_none import to_int_or_none
 from utils.install_tesseract import ensure_tesseract                                    # to ensure tesseract installed
 from tesseract import process_yugioh_card                                               # for ocr image processing
 from supabase import create_client, Client                                              # for db connections/queries
 from supabase.client import Client                                                      # import supabase_client Client
-
+from utils import convert_int_to_none
 
 # main program variables
 app = Flask(__name__)                               # defines main app object associated with code's current namespace
@@ -40,38 +41,15 @@ def allowed_file(filename):
 # Returns.: session data for all cards in the database
 #######################################################################################################################
 def retrieve_library():
-    db_details = "data_layer/Cards.sqlite3"
+    # If cards are already cached in session, return that session data instead of querying the database
+    if "cards" in session:
+        return session["cards"]
 
-    # If session has no cache or the card with the highest id isn't the same as the last fetch, refresh cache
-    if "cards" not in session:
-        with DBcm.UseDatabase(db_details) as db:
-            sql = """
-                SELECT id, name, card_type, monster_type, description, attack, defense, attribute, image_filename
-                FROM cards
-                ORDER BY name
-            """
-            db.execute(sql)
-            results = db.fetchall()
-
-        # Convert tuples to list of dictionaries for easier Jinja display
-        cards = []
-        for row in results:
-            cards.append({
-                "id": row[0],
-                "name": row[1],
-                "card_type": row[2],
-                "monster_type": row[3],
-                "description": row[4],
-                "attack": row[5],
-                "defense": row[6],
-                "attribute": row[7],
-                "image_filename": row[8],
-            })
-
-        # Save new cache + new database state
-        session["cards"] = cards
-
-    return session["cards"]
+    # otherwise, query supabase, store results in session, then return results
+    response = supabase.table("cards").select("*").order("name").execute()
+    cards = response.data
+    session["cards"] = cards
+    return cards
 
 #######################################################################################################################
 # Function: route that handles get requests for the home page
@@ -104,32 +82,15 @@ def library():
 #######################################################################################################################
 @app.get("/view/<int:card_id>")
 def view_card(card_id):
-    db_details = "data_layer/Cards.sqlite3"
-
-    # query the database to select the chosen card's id number
-    with DBcm.UseDatabase(db_details) as db:
-        query = "SELECT id, name, card_type, monster_type, description, attack, defense, attribute, image_filename FROM cards WHERE id = ?"
-        db.execute(query, (card_id,))
-        row = db.fetchone()
-
-    # if the card isn't found, return an error
-    if not row:
+    # query the db for the card's url id, return error if not found, otherwise render view with the query results
+    response = supabase.table("cards").select("*").eq("id", card_id).single().execute()
+    if not response.data:
         return "Card not found", 404
-
-    # Convert tuple to dictionary
-    card = {
-        "id": row[0],
-        "name": row[1],
-        "card_type": row[2],
-        "monster_type": row[3],
-        "description": row[4],
-        "attack": row[5],
-        "defense": row[6],
-        "attribute": row[7],
-        "image_filename": row[8] if len(row) > 8 else None
-    }
-
-    return render_template("view_card.html", title="View Card", card=card)
+    return render_template(
+        "view_card.html",
+        title="View Card",
+        card=response.data
+    )
 
 #######################################################################################################################
 # Function   : handles get and post requests to update a card's information in the database
@@ -138,20 +99,18 @@ def view_card(card_id):
 #######################################################################################################################
 @app.route("/edit/<int:card_id>", methods=["GET", "POST"])
 def edit_card(card_id):
-    db_details = "data_layer/Cards.sqlite3"
 
-    # GET load the form with card data
     if request.method == "GET":
         cards = retrieve_library()
-        # looks through every card retrieved and returns the matching id
-        # stop the loop once found using the next() function
         card = next((c for c in cards if c["id"] == card_id), None)
 
-        # if card isn't found, return a 404 error
         if card is None:
             return "Card not found", 404
 
-        # otherwise, return add_edit.html with the retrieved card
+        # Normalize None → empty string for form display
+        card["attack"] = "" if card["attack"] is None else card["attack"]
+        card["defense"] = "" if card["defense"] is None else card["defense"]
+
         return render_template(
             "add_edit.html",
             title="Edit Card",
@@ -159,31 +118,80 @@ def edit_card(card_id):
             card=card
         )
 
-    # POST and save the updated card
+    # POST request
+    # POST request
     form = request.form
-    with DBcm.UseDatabase(db_details) as db:
-        sql = """
-            UPDATE cards
-            SET name=?, card_type=?, monster_type=?, description=?, attack=?, defense=?, attribute=?
-            WHERE id=?
-        """
-        db.execute(sql, (
-            form["name"],
-            form["card_type"],
-            form["monster_type"],
-            form["description"],
-            form["attack"],
-            form["defense"],
-            form["attribute"],
-            card_id
-        ))
 
-    # Clear the cached library so it refreshes
+    card = {
+        "name": form["name"],
+        "card_type": form["card_type"],
+        "monster_type": form.get("monster_type"),
+        "description": form["description"],
+        "attack": to_int_or_none(form.get("attack")),
+        "defense": to_int_or_none(form.get("defense")),
+        "attribute": form.get("attribute"),
+    }
+
+    # Fetch existing image filename
+    existing = supabase.table("cards") \
+        .select("image_filename") \
+        .eq("id", card_id) \
+        .single() \
+        .execute()
+
+    old_filename = existing.data.get("image_filename")
+    new_filename = old_filename
+
+    file = request.files.get("card_image")
+
+    if file and file.filename:
+        if not allowed_file(file.filename):
+            flash("Unsupported file type.", "danger")
+            card["image_filename"] = old_filename
+            return render_template(
+                "add_edit.html",
+                title="Edit Card",
+                KNOWN_ATTRIBUTES=KNOWN_ATTRIBUTES,
+                card=card
+            )
+
+        new_filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], new_filename))
+
+        # Remove old image safely
+        if old_filename:
+            old_path = os.path.join(app.config["UPLOAD_FOLDER"], old_filename)
+            if os.path.exists(old_path):
+                os.remove(old_path)
+
+    card["image_filename"] = new_filename
+
+    try:
+        supabase.table("cards").update(card).eq("id", card_id).execute()
+
+    except Exception as e:
+        message = str(e).lower()
+
+        if "duplicate key" in message or "unique" in message:
+            flash("A card with that name already exists.", "danger")
+        else:
+            flash(f"An unexpected database error occurred: {e}", "danger")
+
+        card["id"] = card_id
+        card["attack"] = "" if card["attack"] is None else card["attack"]
+        card["defense"] = "" if card["defense"] is None else card["defense"]
+
+        return render_template(
+            "add_edit.html",
+            title="Edit Card",
+            KNOWN_ATTRIBUTES=KNOWN_ATTRIBUTES,
+            card=card
+        )
+
     session.pop("cards", None)
-
     flash("Card successfully updated!", "success")
-
     return redirect(url_for("library"))
+
 
 #######################################################################################################################
 # Function   : handles get and post requests for adding a new card to the database
@@ -191,9 +199,7 @@ def edit_card(card_id):
 #######################################################################################################################
 @app.route("/add", methods=["GET", "POST"])
 def add_card():
-    db_details = "data_layer/Cards.sqlite3"
-
-    # if a post is made, parse the form's data into variables
+    # for POST requests, parse form data into a card dictionary
     if request.method == "POST":
         name = request.form["name"]
         card_type = request.form["card_type"]
@@ -203,6 +209,11 @@ def add_card():
         defense = request.form.get("defense")
         attribute = request.form.get("attribute")
 
+        # convert any empty strings for integers to None as required by PostgreSQL
+        if card_type is not "Monster":
+            attack = to_int_or_none(request.form.get("attack"))
+            defense = to_int_or_none(request.form.get("defense"))
+
         card = {
             "name": name,
             "card_type": card_type,
@@ -210,15 +221,36 @@ def add_card():
             "monster_type": monster_type,
             "attack": attack,
             "defense": defense,
-            "attribute": attribute
+            "attribute": attribute,
         }
 
-        # Retrieve the card image uploaded by the user if they supplied one
+        # get the image file uploaded by user if they supplied one. only accepts valid file extensions
         file = request.files.get("card_image")
-
         if file and not allowed_file(file.filename):
-            # Save the uploaded file
-            flash("Unsupported file type. Please use one of the following extensions: png, jpg, jpeg, gif", "danger")
+            flash("Unsupported file type.", "danger")
+            return render_template("add_edit.html", title="Add Card", KNOWN_ATTRIBUTES=KNOWN_ATTRIBUTES, card=card)
+
+        # if file is a valid extension, sanitize the filename and save it. otherwise return nothing
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+        else:
+            filename = None
+        card["image_filename"] = filename
+
+        # SUPABASE INSERT
+        try:
+            # Insert into Supabase
+            supabase.table("cards").insert(card).execute()
+
+        except Exception as e:
+            message = str(e).lower()
+
+            if "duplicate key" in message or "unique" in message:
+                flash("A card with that name already exists.", "danger")
+            else:
+                flash(f"An unexpected database error occurred: {e}", "danger")
+
             return render_template(
                 "add_edit.html",
                 title="Add Card",
@@ -226,44 +258,15 @@ def add_card():
                 card=card
             )
 
-        # if the file exists and is an allowed extension, sanitize the filename and save to the upload folder
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-        else:
-            filename = None
-
-        # Save all data to the database
-        with DBcm.UseDatabase(db_details) as db:
-            # placeholder query
-            sql = """
-            INSERT INTO cards (name, card_type, monster_type, description, attack, defense, attribute, image_filename)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """
-            db.execute(sql, (
-                name,
-                card_type,
-                monster_type,
-                description,
-                attack,
-                defense,
-                attribute,
-                filename
-            ))
-
-        #Clear session cache so the app is forced to refresh it next time. Prevent errors in no cache by that key exists
         session.pop("cards", None)
-
-        # send a confirmation flash message back the return page and redirect back to home page
         flash("Card successfully added!", "success")
         return redirect(url_for("index"))
 
-    # otherwise, handle a simple get request that returns a blank add/edit page
     return render_template(
         "add_edit.html",
         title="Add Card",
         KNOWN_ATTRIBUTES=KNOWN_ATTRIBUTES,
-        card=None  # no card = adding mode
+        card=None
     )
 
 #######################################################################################################################
@@ -273,26 +276,12 @@ def add_card():
 #######################################################################################################################
 @app.get("/delete/<int:card_id>")
 def confirm_delete(card_id):
-    db_details = "data_layer/Cards.sqlite3"
+    response = supabase.table("cards").select("id, name, image_filename").eq("id", card_id).single().execute()
 
-    # retrieve the card to be deleted from the database to display to the user for confirmation
-    with DBcm.UseDatabase(db_details) as db:
-        sql = "SELECT id, name, image_filename FROM cards WHERE id = ?"
-        db.execute(sql, (card_id,))
-        card = db.fetchone()
-
-    # if the card doesn't exist in the database, just redirect back to the library page to prevent crashes
-    if not card:
+    if not response.data:
         return redirect("/library")
 
-    # parse only required data from the card to return back to confirm.html as a dictionary
-    card_obj = {
-        "id": card[0],
-        "name": card[1],
-        "image_filename": card[2]
-    }
-
-    return render_template("confirm_delete.html",title="Confirm Delete", card=card_obj)
+    return render_template("confirm_delete.html", title="Confirm Delete", card=response.data)
 
 #######################################################################################################################
 # Function   : handles get requests to delete a card from the database
@@ -301,29 +290,29 @@ def confirm_delete(card_id):
 #######################################################################################################################
 @app.post("/delete/<int:card_id>")
 def delete_card(card_id):
-    db_details = "data_layer/Cards.sqlite3"
 
-    # perform the database operation for selecting the chosen card from the database and actually deleting it
-    with DBcm.UseDatabase(db_details) as db:
-        sql = "SELECT image_filename FROM cards WHERE id = ?"
-        db.execute(sql, (card_id,))
-        row = db.fetchone()
+    # fetch card (for image delete)
+    existing = supabase.table("cards").select("image_filename").eq("id", card_id).single().execute()
 
-        sql = "DELETE FROM cards WHERE id = ?"
-        db.execute(sql, (card_id,))
+    # delete from supabase
+    supabase.table("cards").delete().eq("id", card_id).execute()
 
-    # Clear cached session list
     session.pop("cards", None)
 
-    # Delete image file if present
-    if row and row[0]:
-        filepath = os.path.join("static", "images", "cards", row[0])
+    # delete local file
+    if existing.data and existing.data["image_filename"]:
+        filepath = os.path.join("static", "images", "cards", existing.data["image_filename"])
         if os.path.exists(filepath):
             os.remove(filepath)
 
     flash("Card successfully deleted", "danger")
     return redirect(url_for("library"))
 
+#######################################################################################################################
+# Function   : handles get and post requests for scanning a card image to add to the database
+# Parameters : none
+# Returns    : confirm_scan.html
+#######################################################################################################################
 @app.route("/scan", methods=["GET", "POST"])
 def scan():
     if request.method == "GET":
@@ -368,6 +357,11 @@ def scan():
 
     return render_template("confirm_scan.html",title="Confirm Scan", card=card_data)
 
+#######################################################################################################################
+# Function   : handles post requests for confirming a scanned cards ocr data for saving to the db
+# Parameters : none
+# Returns    : index.html
+#######################################################################################################################
 @app.post("/confirm_scan")
 def confirm_scan():
     # store form data posted by the user
@@ -383,14 +377,14 @@ def confirm_scan():
     file = request.files.get("card_image")
     existing_filename = request.form.get("image_filename")
 
-    # If user uploaded a new image, save it. Otherwise, keep the original filename
+    # If user uploaded a new file, save it. Otherwise, use existing file
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
     else:
         filename = existing_filename
 
-    # define a dictionary from all data obtained for the card
+    # define dictionary for returning to template on error
     card = {
         "name": name,
         "card_type": card_type,
@@ -402,49 +396,34 @@ def confirm_scan():
         "image_filename": filename
     }
 
-    # Save data to database
-    db_details = "data_layer/Cards.sqlite3"
-    with DBcm.UseDatabase(db_details) as db:
-        sql = """
-            INSERT INTO cards (name, card_type, monster_type, description, attack, defense, attribute, image_filename)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        try:
-            db.execute(sql, (
-                name,
-                card_type,
-                monster_type,
-                description,
-                attack,
-                defense,
-                attribute,
-                filename
-            ))
-        # handle any unique constraint errors
-        except sqlite3.IntegrityError as e:
+    # SUPABASE INSERT
+    try:
+        supabase.table("cards").insert(card).execute()
+
+    except Exception as e:
+        # Supabase unique constraint violation looks like:
+        #  "duplicate key value violates unique constraint "cards_name_key""
+        message = str(e).lower()
+
+        if "duplicate key" in message or "unique" in message:
             flash("A card with that name already exists.", "danger")
-            # attempt to retrieve the filepath to the host machine's installed tesseract program
-            tesseract_path = ensure_tesseract()
-
-            # if tesseract is found, pass True to the page rendered. Otherwise, pass False to the page
-            if tesseract_path:
-                tesseract_exists = True
-            else:
-                tesseract_exists = False
-            return render_template(
-                "confirm_scan.html",
-                title="Scan Card",
-                tesseract_exists=tesseract_exists,
-                card=card)
-        except Exception as e:
-            # This catches all OTHER errors
+        else:
             flash(f"An unexpected database error occurred: {e}", "danger")
-            return render_template("confirm_scan.html", card=card)
 
+        # return user to confirmation page with their data intact
+        tesseract_exists = ensure_tesseract() is not None
+        return render_template(
+            "confirm_scan.html",
+            title="Scan Card",
+            tesseract_exists=tesseract_exists,
+            card=card
+        )
+
+    # Success → Clear cache and redirect
     session.pop("cards", None)
-
     flash("Card successfully added!", "success")
     return redirect(url_for("index"))
+
 
 # if the program is run directly, open the app in a web browser and run the app
 if __name__ == "__main__":
